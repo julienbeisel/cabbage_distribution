@@ -1,0 +1,9 @@
+#!/bin/sh
+echo "Running postinstall" > /tmp/my_postinstall.log
+
+sudo -u $USER mkdir -p $HOME/Music/Nymano\ Audio/AudioShaper2
+rsync -r --delete "/tmp/NymanoAudio/Presets" $HOME/Music/Nymano\ Audio/AudioShaper2
+sudo chmod ugo+rwx $HOME/Music/Nymano\ Audio/AudioShaper2
+sudo chmod ugo+rwx $HOME/Music/Nymano\ Audio/AudioShaper2/Presets
+
+exit 0
