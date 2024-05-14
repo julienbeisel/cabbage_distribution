@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <pkg-ref id="com.NymanoAudio.AudioShaper2component"/>
+    <pkg-ref id="com.NymanoAudio.AudioShaper2vst"/>
+    <pkg-ref id="com.NymanoAudio.AudioShaper2vst3"/>
+    <pkg-ref id="com.NymanoAudio.AudioShaper2assets"/>
+    <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="com.NymanoAudio.AudioShaper2component"/>
+            <line choice="com.NymanoAudio.AudioShaper2vst"/>
+            <line choice="com.NymanoAudio.AudioShaper2vst3"/>
+            <line choice="com.NymanoAudio.AudioShaper2assets"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="com.NymanoAudio.AudioShaper2component" visible="false">
+        <pkg-ref id="com.NymanoAudio.AudioShaper2component"/>
+    </choice>
+    <pkg-ref id="com.NymanoAudio.AudioShaper2component" version="1.01" onConclusion="none">Nymano%20AudioShaper2_au.pkg</pkg-ref>
+    <choice id="com.NymanoAudio.AudioShaper2vst" visible="false">
+        <pkg-ref id="com.NymanoAudio.AudioShaper2vst"/>
+    </choice>
+    <pkg-ref id="com.NymanoAudio.AudioShaper2vst" version="1.01" onConclusion="none">Nymano%20AudioShaper2_vst.pkg</pkg-ref>
+    <choice id="com.NymanoAudio.AudioShaper2vst3" visible="false">
+        <pkg-ref id="com.NymanoAudio.AudioShaper2vst3"/>
+    </choice>
+    <pkg-ref id="com.NymanoAudio.AudioShaper2vst3" version="1.01" onConclusion="none">Nymano%20AudioShaper2_vst3.pkg</pkg-ref>
+    <choice id="com.NymanoAudio.AudioShaper2assets" visible="false">
+        <pkg-ref id="com.NymanoAudio.AudioShaper2assets"/>
+    </choice>
+    <pkg-ref id="com.NymanoAudio.AudioShaper2assets" version="1.01" onConclusion="none">Nymano%20AudioShaper2_assets.pkg</pkg-ref>
+</installer-gui-script>
