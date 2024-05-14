@@ -1,0 +1,127 @@
+trigger:
+  - main
+
+jobs:
+  - job: macOS
+
+    pool:
+      vmImage: 'macOS-latest'
+
+    variables: 
+    - group: 'VST Build'
+
+    steps:
+    
+    ####################################################################
+    # > Configuration of the environment to enable codesigning
+
+    # Add your certificates here
+    # Note: Due to the poor documentation of these steps, I couldn't find the steps followed to create these certificates
+    # and add them here, but you should find it easily when you Google "Azure Pipeline certificate codesign"
+    
+    - task: DownloadSecureFile@1
+      name: Certificat
+      displayName: 'Download CA certificate'
+      inputs:
+        secureFile: 'Certificat.p12'
+    - task: DownloadSecureFile@1
+      name: CertificatDeveloperLegacy
+      displayName: 'Download Developer Certificate'
+      inputs:
+        secureFile: 'CertificatDeveloperLegacy.p12'
+    - bash: |
+        sudo security create-keychain -p "DEFAULT" /Library/Keychains/app-signing.keychain-db
+        sudo security set-keychain-settings -lut 21600 /Library/Keychains/app-signing.keychain-db
+        sudo security unlock-keychain -p "DEFAULT" /Library/Keychains/app-signing.keychain-db
+      env:
+        P12_PASSWORD: $(P12password)
+    - bash: sudo security import $(Certificat.secureFilePath) -k /Library/Keychains/app-signing.keychain-db -P $(P12password) -A -T /usr/bin/codesign
+      env:
+        P12_PASSWORD: $(P12password)
+    - bash: sudo security import $(CertificatDeveloperLegacy.secureFilePath) -k /Library/Keychains/app-signing.keychain-db -P $(P12password) -A -T /usr/bin/codesign
+      env:
+        P12_PASSWORD: $(P12password)
+    - bash: 'sudo security set-key-partition-list -S apple-tool:,apple: -k "DEFAULT" /Library/Keychains/app-signing.keychain-db'
+    - bash: sudo security list-keychain -d user -s /Library/Keychains/app-signing.keychain-db "login.keychain"
+
+    # End of the codesigning/notarization configuration
+    ####################################################################
+
+    ####################################################################
+    # > Csound and Cabbage installation
+
+    # Change csound link below if needed
+    - script: sudo installer -pkg csound/csound-MacOS-universal-6.18.1.pkg -target /
+    # Update Cabbage link below if needed (since this link will be deprecated soon)
+    - script: curl "https://dev.azure.com/rorywalsh/bcec3bb5-38dd-46ef-bf56-bf769f4c7253/_apis/build/builds/2749/artifacts?artifactName=Installers&api-version=7.1&%24format=zip" -o Installers.zip
+    - script: unzip Installers.zip
+    - script: sudo installer -pkg Installers/CabbageOSXInstaller-2.9.226.pkg -target /
+
+    # End of Csoud and Cabbage installation
+    ####################################################################
+    
+    ####################################################################
+    # >VST/VST3/AU exports
+    - script: /Applications/Cabbage.app/Contents/CLIConverter --export-VST=$(Build.Repository.LocalPath)/AudioShaper2.csd --destination=$(Build.Repository.LocalPath)/
+    - script: /Applications/Cabbage.app/Contents/CLIConverter --export-VST3=$(Build.Repository.LocalPath)/AudioShaper2.csd --destination=$(Build.Repository.LocalPath)/
+    - script: /Applications/Cabbage.app/Contents/CLIConverter --export-AU=$(Build.Repository.LocalPath)/AudioShaper2.csd --destination=$(Build.Repository.LocalPath)/
+    - script: ls # Check if you can actually see the exports in the Pipeline workspace
+    
+    # End of VST/VST3/AU exports
+    ####################################################################
+
+    ####################################################################
+    # > Csound relinking
+    # -- VST
+    - script: mkdir AudioShaper2.vst/Contents/Resources/
+    - script: cp -R /Library/Frameworks/CsoundLib64.framework AudioShaper2.vst/Contents/Resources/CsoundLib64.framework/
+    - script: |
+        cd AudioShaper2.vst/Contents/Resources/CsoundLib64.framework/ 
+        sudo install_name_tool -id "@rpath/CsoundLib64.framework/CsoundLib64" CsoundLib64
+    - script: |
+        cd AudioShaper2.vst/Contents/MacOS/
+        sudo install_name_tool -change /Library/Frameworks/CsoundLib64.framework/CsoundLib64 @loader_path/../Resources/CsoundLib64.framework/CsoundLib64 AudioShaper2
+    # -- VST3
+    - script: mkdir AudioShaper2.vst3/Contents/Resources/
+    - script: cp -R /Library/Frameworks/CsoundLib64.framework AudioShaper2.vst3/Contents/Resources/CsoundLib64.framework/
+    - script: |
+        cd AudioShaper2.vst3/Contents/Resources/CsoundLib64.framework/ 
+        sudo install_name_tool -id "@rpath/CsoundLib64.framework/CsoundLib64" CsoundLib64
+    - script: |
+        cd AudioShaper2.vst3/Contents/MacOS/
+        sudo install_name_tool -change /Library/Frameworks/CsoundLib64.framework/CsoundLib64 @loader_path/../Resources/CsoundLib64.framework/CsoundLib64 AudioShaper2
+    # -- AU
+    # - script: mkdir AudioShaper2.component/Contents/Resources/
+    - script: cp -R /Library/Frameworks/CsoundLib64.framework AudioShaper2.component/Contents/Resources/CsoundLib64.framework/
+    - script: |
+        cd AudioShaper2.component/Contents/Resources/CsoundLib64.framework/ 
+        sudo install_name_tool -id "@rpath/CsoundLib64.framework/CsoundLib64" CsoundLib64
+    - script: |
+        cd AudioShaper2.component/Contents/MacOS/
+        sudo install_name_tool -change /Library/Frameworks/CsoundLib64.framework/CsoundLib64 @loader_path/../Resources/CsoundLib64.framework/CsoundLib64 CabbagePluginEffect
+    # End of Csound relinking
+    ####################################################################
+
+    ####################################################################
+    # > Codesigning
+    - bash: xcrun notarytool store-credentials --apple-id "replacewithyouremail@email.com" --team-id "replacewithyourteamID" --password "$(CertificatePass)" "notary-scriptingosx"
+      env:
+          CertificatePass: $(CertificatePass)
+    - script: python scripts/macos/codesign.py
+      env:
+        AppPass: $(AppPass)
+    # End of codesigning
+    ####################################################################
+
+    ####################################################################
+    # > Create installers and publish artifacts
+
+    - script: python scripts/macos/installers.py
+    - script: xcrun notarytool submit AudioShaper2_installer.pkg --keychain-profile "notary-scriptingosx" --wait
+    - task: CopyFiles@2
+      inputs:
+        targetFolder: '$(Build.ArtifactStagingDirectory)' 
+    - task: PublishBuildArtifacts@1
+      inputs:
+        artifactName: 'AudioShaper2 MacOS'
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/AudioShaper2_installer.pkg'
